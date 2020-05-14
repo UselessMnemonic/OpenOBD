@@ -13,8 +13,12 @@ https://tinycircuits.com/collections/kits-1/products/tinyzero-basic-kit
 A Bluetooth module compatible with the TinyZero is also available:
 https://tinycircuits.com/collections/communication/products/bluetooth-low-energy-tinyshield
 
-Finally, during development, we will focus more on the software than hardware design. We will be using an OBDII-to-UART adapter:
-https://www.sparkfun.com/products/9555
+Finally, during development, we will focus more on the software than hardware design. We will be using the Freematics OBD UART adapter:
+https://freematics.com/pages/products/freematics-obd-ii-uart-adapter-mk2/
+
+## Libraries
+Bluetooth: https://github.com/TinyCircuits/TinyCircuits-TinyShield-BLE-ASD2116/tree/master/examples/STBLE
+OBD Adapter: https://github.com/stanleyhuangyc/ArduinoOBD/tree/master/libraries/OBD2UART
 
 ## Schedule for Module
 1. Design a connector circuit that adheres to voltage and current draw specification. (1 week)
