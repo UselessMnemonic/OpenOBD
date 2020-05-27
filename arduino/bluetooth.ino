@@ -36,7 +36,7 @@ uint16_t BLEConnHandle,
          UARTRXCharHandle;
 
 // Bluetooth MAC Address
-uint8_t BDADDR[] = {0x12, 0x34, 0x00, 0xE1, 0x80, 0x22};
+uint8_t BDADDR[] = {0xE8, 0xE1, 0xD5, 0xE1, 0x73, 0xCD};
 
 // Bluetooth Names
 const char LOCAL_NAME[] = {AD_TYPE_COMPLETE_LOCAL_NAME, 'O', 'p', 'e', 'n', 'O', 'B', 'D'};
@@ -109,7 +109,7 @@ void OnReadRequest(uint16_t handle) {
 }
 
 // when the UART attribute is modified, we should notify the applicaiton
-void OnAttributeModified(uint16_t handle, uint8_t data_length, uint8_t *att_data) {
+void OnAttributeModified(uint16_t handle, uint8_t data_length, uint8_t* att_data) {
   if (handle == UARTTXCharHandle + 1) {
     int i;
     for (i = 0; i < data_length; i++) {
@@ -122,12 +122,10 @@ void OnAttributeModified(uint16_t handle, uint8_t data_length, uint8_t *att_data
 }
 
 // occurs when a point-to-point connection is established
-void OnConnectionComplete(uint8_t addr[6], uint16_t connection_handle) {
+void OnConnectionComplete(uint8_t* addr, uint16_t connection_handle) {
   printf("BLE: Connected to MAC ");
-  for (int i = 5; i > 0; i--) {
-    printf("%02X-", addr[i]);
-  }
-  printf("%02X -> #%hu\r\n", addr[0], connection_handle);
+  for (int i = 5; i > 0; i--) printf("%02X:", (int)addr[i]);
+  printf("%02X (#%hu)\r\n", (int)addr[0], connection_handle);
 
   BLEConnHandle = connection_handle;
   do_unconnectable = 1;
@@ -142,10 +140,10 @@ void OnDisconnectionComplete(void) {
 }
 
 // the real meat and potatoes of the loop logic
-extern "C" void HCI_Event_CB(void *pckt);
-void HCI_Event_CB(void *pckt) {
-  hci_uart_pckt *hci_pckt = (hci_uart_pckt *)pckt;
-  hci_event_pckt *event_pckt = (hci_event_pckt*)hci_pckt->data;
+extern "C" void HCI_Event_CB(void* pckt);
+void HCI_Event_CB(void* pckt) {
+  hci_uart_pckt* hci_pckt = (hci_uart_pckt*) pckt;
+  hci_event_pckt* event_pckt = (hci_event_pckt*) hci_pckt->data;
 
   if (hci_pckt->type != HCI_EVENT_PKT) return;
 
@@ -157,10 +155,10 @@ void HCI_Event_CB(void *pckt) {
     }
     
     case EVT_LE_META_EVENT: {
-      evt_le_meta_event *evt = (evt_le_meta_event *)event_pckt->data;
+      evt_le_meta_event* evt = (evt_le_meta_event*) event_pckt->data;
       switch (evt->subevent) {
         case EVT_LE_CONN_COMPLETE: {
-          evt_le_connection_complete *cc = (evt_le_connection_complete *)evt->data;
+          evt_le_connection_complete* cc = (evt_le_connection_complete*) evt->data;
           OnConnectionComplete(cc->peer_bdaddr, cc->handle);
           break;
         }
@@ -169,15 +167,15 @@ void HCI_Event_CB(void *pckt) {
     }
     
     case EVT_VENDOR: {
-      evt_blue_aci *blue_evt = (evt_blue_aci *)event_pckt->data;
+      evt_blue_aci* blue_evt = (evt_blue_aci*) event_pckt->data;
       switch (blue_evt->ecode) {
         case EVT_BLUE_GATT_READ_PERMIT_REQ: {
-          evt_gatt_read_permit_req *pr = (evt_gatt_read_permit_req *)blue_evt->data;
+          evt_gatt_read_permit_req* pr = (evt_gatt_read_permit_req*) blue_evt->data;
           OnReadRequest(pr->attr_handle);
           break;
         }
         case EVT_BLUE_GATT_ATTRIBUTE_MODIFIED: {
-          evt_gatt_attr_modified_IDB05A1 *evt = (evt_gatt_attr_modified_IDB05A1*)blue_evt->data;
+          evt_gatt_attr_modified_IDB05A1* evt = (evt_gatt_attr_modified_IDB05A1*) blue_evt->data;
           OnAttributeModified(evt->attr_handle, evt->data_length, evt->att_data);
           break;
         }
@@ -268,7 +266,7 @@ void bluetooth_init() {
   BlueNRG_RST();
 
   /* Edit configuration */
-  ret = aci_hal_write_config_data(CONFIG_DATA_PUBADDR_OFFSET, CONFIG_DATA_PUBADDR_LEN, BDADDR);
+  ret = aci_hal_write_config_data(CONFIG_DATA_PUBADDR_OFFSET, 6, BDADDR);
   while (ret != BLE_STATUS_SUCCESS) {
     printf("aci_hal_write_config_data failed: ");
     print_status(ret);
