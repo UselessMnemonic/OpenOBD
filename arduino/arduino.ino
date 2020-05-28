@@ -2,6 +2,7 @@
 #include "bluetooth.h"
 #include <SPI.h>
 #include <stdio.h>
+#include "UartStream.h"
 
 // libc functions
 extern "C" void __libc_init_array(void);
@@ -10,14 +11,11 @@ extern "C" int _write(int fd, const void *buf, size_t count) {
   return 0;
 }
 
-// event handlers
-void bluetooth_on_uart_rx(uint8_t *buf, uint8_t len) {
-  printf("BLE: Got [%d]: %s\r\n", len, (const char*)buf);
-  //oobd_process_command(...)
+// UART stream and BLE hook
+UartStream BleUART;
+void bluetooth_on_uart_rx(uint8_t* buf, uint8_t len) {
+    BleUART.notify(buf, len);
 }
-
-// input buffer
-char input_buffer[1024];
 
 // burn, baby! burn!
 int main(void) {
@@ -34,15 +32,28 @@ int main(void) {
   bluetooth_init();
   bluetooth_enable();
 
+  // for tests
+  char buffer[BUFSIZ];
+  int available;
+
   // main loop
   while (1) {
     bluetooth_handle();
-    int num_bytes_available = SerialUSB.available();
-    if (num_bytes_available > 0) {
-      SerialUSB.readBytes(input_buffer, num_bytes_available);
-      input_buffer[num_bytes_available] = '\0';
-      bluetooth_uart_tx((uint8_t*) input_buffer, (uint32_t) num_bytes_available);
-      printf("BLE: Sent [%d]: %s", num_bytes_available, input_buffer);
+
+    available = BleUART.available();
+    if (available > 0) {
+      BleUART.readBytes(buffer, (size_t)available);
+      buffer[available] = 0;
+      printf("BLE: Got [%d]: %s\r\n", available, buffer);
     }
+
+    available = SerialUSB.available();
+    if (available > 0) {
+      SerialUSB.readBytes(buffer, (size_t)available);
+      buffer[available] = 0;
+      printf("BLE: Sent [%d]: %s\r\n", available, buffer);
+      BleUART.write((const uint8_t*)buffer, (size_t)available);
+    }
+
   }
 }
