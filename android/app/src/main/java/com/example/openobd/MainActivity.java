@@ -6,22 +6,34 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothManager;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.TextView;
-import android.widget.Toast;
-
+import java.nio.charset.StandardCharsets;
+import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements View.OnClickListener {
 
     private class UARTGattHandler extends BluetoothGattCallback {
+
+        /* Queues for UART RX/TX */
+        private Queue<String> writeQueue;
+
+        /* Keep track of when a read and write is happening */
+        private boolean writeInProgress;
+
+        public UARTGattHandler() {
+            writeInProgress = false;
+            writeQueue = new ConcurrentLinkedQueue<>();
+        }
 
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
@@ -33,8 +45,11 @@ public class MainActivity extends Activity {
 
                 // When Bluetooth connects
                 case BluetoothGatt.STATE_CONNECTED:
-                    if (status == BluetoothGatt.GATT_SUCCESS) gatt.discoverServices();
-                    else appendLine("-- Could not connect to " + gatt.getDevice().getAddress() + " --\n");
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        appendLine("-- OpenOBD found --\n");
+                        gatt.discoverServices();
+                    }
+                    else appendLine("-- Could not find OpenOBD module --\n");
                     break;
 
                 // When Bluetooth disconnects, we disabled the UI
@@ -54,7 +69,7 @@ public class MainActivity extends Activity {
             super.onServicesDiscovered(gatt, status);
 
             if (status == BluetoothGatt.GATT_FAILURE) {
-                appendLine("-- Could not connect to " + gatt.getDevice().getAddress() + "  --\n");
+                appendLine("-- Could not connect to OpenOBD module --\n");
                 return;
             }
 
@@ -69,31 +84,54 @@ public class MainActivity extends Activity {
             gatt.setCharacteristicNotification(mTX, false);
 
             enableUI(true);
-            appendLine("-- Connected to " + gatt.getDevice().getAddress() + "  --\n");
+            appendLine("-- Connected to OpenOBD module --\n");
         }
 
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
 
-            // print message to text view
+            // print message to text view, this should only ever come from mRX
             appendLine(characteristic.getStringValue(0));
 
             //TODO We could do some sort of message control as to reconstruct whole packets
         }
 
-        public void send(String message) {
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            super.onCharacteristicWrite(gatt, characteristic, status);
+
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(TAG,"Wrote: " + characteristic.getStringValue(0));
+            }
+
+            // continue writing if we have more chunks
+            if (writeQueue.isEmpty()) writeInProgress = false;
+            else writeQueueFront();
+        }
+
+        private void send(String message) {
 
             // We can only send 20 bytes per packet, so we partition each message
             for (int len = message.length(); len > BLE_UART_TX_BUFFSIZE; len -= BLE_UART_TX_BUFFSIZE) {
-                mTX.setValue(message.substring(0, BLE_UART_TX_BUFFSIZE));
+                writeQueue.add(message.substring(0, BLE_UART_TX_BUFFSIZE));
                 message = message.substring(BLE_UART_TX_BUFFSIZE);
             }
 
             // lagging bit of message left over
-            if (!message.isEmpty()) {
-                mTX.setValue(message);
+            if (!message.isEmpty()) writeQueue.add(message);
+
+            // tell system to start sending the chunks if it isn't already
+            if (!writeInProgress && !writeQueue.isEmpty()) {
+                writeInProgress = true;
+                writeQueueFront();
             }
+        }
+
+        private void writeQueueFront() {
+            String chunk = writeQueue.poll();
+            mTX.setValue(chunk);
+            mGatt.writeCharacteristic(mTX);
         }
     }
 
@@ -103,6 +141,7 @@ public class MainActivity extends Activity {
     public static final UUID TX_UUID   = UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
     public static final UUID RX_UUID   = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
     public static final int BLE_UART_TX_BUFFSIZE = 20;
+    public static final String TAG = "OpenOBD";
 
     /* UI elements */
     private TextView mMessages;
@@ -111,10 +150,9 @@ public class MainActivity extends Activity {
     private CheckBox mUseNewline;
 
     /* BLE state */
-    private BluetoothManager mBLEManager;
     private BluetoothAdapter mBLEAdapter;
-    private BluetoothGatt mGatt;
     private BluetoothDevice mOpenOBD;
+    private BluetoothGatt mGatt;
 
     /* UART state */
     private UARTGattHandler mUART;
@@ -126,15 +164,16 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         // Grab references to UI elements.
-        mMessages = findViewById(R.id.messages);
-        mInput = findViewById(R.id.input);
-        mUseNewline = findViewById(R.id.newline);
+        mMessages = (TextView) findViewById(R.id.messages);
+        mInput = (EditText) findViewById(R.id.input);
+        mUseNewline = (CheckBox) findViewById(R.id.newline);
 
         // Enable auto-scroll in the TextView
         mUseNewline.setMovementMethod(new ScrollingMovementMethod());
 
         // Disable the send button until we're connected.
-        mSendButton = findViewById(R.id.send);
+        mSendButton = (Button) findViewById(R.id.send);
+        mSendButton.setOnClickListener(this);
         enableUI(false);
 
         // Initialize Bluetooth
@@ -142,12 +181,12 @@ public class MainActivity extends Activity {
         mUART = null;
         mRX = null;
         mTX = null;
+        mGatt = null;
 
         // Make sure BLE is enabled
         mBLEAdapter = BluetoothAdapter.getDefaultAdapter();
         if (mBLEAdapter == null || !mBLEAdapter.isEnabled()) {
-            Toast.makeText(this, "Bluetooth must be enabled.", Toast.LENGTH_LONG).show();
-            finish();
+            appendLine("-- Bluetooth must be enabled --\n");
         }
         else {
             // find OpenOBD device
@@ -160,8 +199,7 @@ public class MainActivity extends Activity {
             }
 
             if (mOpenOBD == null) {
-                Toast.makeText(this, "You must pair with the OpenOBD module.", Toast.LENGTH_LONG).show();
-                finish();
+                appendLine("-- OpenOBD module not paired, please pair --\n");
             }
             else {
                 // Connect to OpenOBD (Async)
@@ -183,31 +221,23 @@ public class MainActivity extends Activity {
 
     /* Write text to the text view */
     private void appendLine(final CharSequence text) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                mMessages.append(text);
-            }
-        });
+        runOnUiThread(() -> mMessages.append(text));
     }
 
     private void enableUI(final boolean enable) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                mSendButton.setClickable(enable);
-                mSendButton.setEnabled(enable);
-            }
+        runOnUiThread(() -> {
+            mSendButton.setClickable(enable);
+            mSendButton.setEnabled(enable);
         });
     }
 
     // Handler for mouse click on the send button.
-    public void sendClick(View view) {
-
-        // Make string and add newline if requested
-        StringBuilder stringBuilder = new StringBuilder();
-
+    public void onClick(View view) {
         String message = mInput.getText().toString();
+        if (message.isEmpty()) return;
+
+        mInput.setText("");
+        mInput.setHint("Sent: " + message);
         if (mUseNewline.isChecked())
             message += "\r\n";
         mUART.send(message);
