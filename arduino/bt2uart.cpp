@@ -116,6 +116,7 @@ static const char PID_names[128][32] = {
 
 uint8_t init_complete = 0;
 
+//TODO: Should convert vector uart_requests into an array and return it to pass to the ELM
 void process_bluetooth_read_req(uint64_t upper_qword=0x00, uint64_t lower_qword=0x00) {
   if (upper_qword & (1 << 63) || !init_complete) {
     return;  //This is a Write request and not a read request. Something went wrong if this line triggers.
