@@ -332,7 +332,7 @@ void bluetooth_handle() {
   }
 }
 
-uint8_t bluetooth_uart_tx(uint8_t *buf, uint8_t len) {
+uint8_t bluetooth_uart_tx(uint8_t *buf, uint32_t len) {
 
   uint8_t nextLen;
   tBleStatus ret;
@@ -340,7 +340,7 @@ uint8_t bluetooth_uart_tx(uint8_t *buf, uint8_t len) {
   
   while(len > 0) {
     
-    nextLen = (BLE_UART_TX_BUFFSIZE < len) ? (BLE_UART_TX_BUFFSIZE) : len;
+    nextLen = (len > BLE_UART_TX_BUFFSIZE) ? (BLE_UART_TX_BUFFSIZE) : (uint8_t) len;
     ret = aci_gatt_update_char_value(UARTServHandle, UARTRXCharHandle, 0, nextLen, buf);
     
     if (ret != BLE_STATUS_SUCCESS) {
@@ -348,7 +348,7 @@ uint8_t bluetooth_uart_tx(uint8_t *buf, uint8_t len) {
       return 0;
     }
     
-    len = len - nextLen;
+    len = len - (uint32_t)nextLen;
     buf = (uint8_t*)(buf + nextLen);
     
   }
