@@ -141,3 +141,27 @@ void process_bluetooth_read_req(uint64_t upper_qword=0x00, uint64_t lower_qword=
   }
   */
 }
+
+//TODO: This should either return the serialized object to take in a buffer to put it in
+char* generate_json_response(uint16_t pids[], size_t len) {
+
+  const int capacity = JSON_OBJECT_SIZE(len);
+  StaticJsonDocument<capacity> doc;
+
+  char output_buffer[4096];
+
+  for (int i = 0; i < len * 2; i+=2) {
+      size_t pos = 0;
+      //TODO: Assumes it receives a good value; doesn't have a check for an invalid PID.
+      for (int j = 0; j < 128; ++j) {
+        if (valid_PIDs[j] == pids[i]) {
+          pos = j;
+          break;
+        }
+      }
+    doc[PID_names[j]] = pids[i+1];
+  }
+
+  serializeJson(doc, output_buffer);
+  return output_buffer;
+}
