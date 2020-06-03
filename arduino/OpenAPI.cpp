@@ -28,7 +28,7 @@ void OpenAPI::process(Stream& clientStream) {
       SerialUSB.print("\r\n-- End Request --\r\n");
       
       // Parse for PID request
-      if (jsonData.containsKey("pid")) {
+      if (jsonData.containsKey("pid") && jsonData.containsKey("seq")) {
         jsonData["result"] = 100;
       }
       else {
