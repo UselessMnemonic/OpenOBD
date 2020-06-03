@@ -8,13 +8,22 @@ import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
+import android.util.JsonReader;
 import android.util.Log;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
-import java.nio.charset.StandardCharsets;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
@@ -22,17 +31,34 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class MainActivity extends Activity implements View.OnClickListener {
 
+    /* This class in the interface between BLE and the Activity */
     private class UARTGattHandler extends BluetoothGattCallback {
 
         /* Queues for UART RX/TX */
-        private Queue<String> writeQueue;
+        private Queue<String> txQueue;
+        private OutputStreamWriter rxBuffer;
+        private JsonReader jsonReader;
 
         /* Keep track of when a read and write is happening */
-        private boolean writeInProgress;
+        private boolean txInProgress;
+        private final Object rxLock; // the piped streams can block on on concurrent ops
 
         public UARTGattHandler() {
-            writeInProgress = false;
-            writeQueue = new ConcurrentLinkedQueue<>();
+            rxLock = new Object();
+            txInProgress = false;
+            txQueue = new ConcurrentLinkedQueue<>();
+            try {
+                // make character streams
+                // data flows from UART -> OutputStream -> InputStream -> JsonStream
+                PipedOutputStream pos = new PipedOutputStream();
+                PipedInputStream pis = new PipedInputStream(pos);
+
+                rxBuffer = new OutputStreamWriter(pos);
+                jsonReader = new JsonReader(new InputStreamReader(pis));
+            } catch (IOException e) {
+                Log.wtf(TAG, e);
+                finish();
+            }
         }
 
         @Override
@@ -46,10 +72,10 @@ public class MainActivity extends Activity implements View.OnClickListener {
                 // When Bluetooth connects
                 case BluetoothGatt.STATE_CONNECTED:
                     if (status == BluetoothGatt.GATT_SUCCESS) {
-                        appendLine("-- OpenOBD found --\n");
+                        appendLine("-- OpenOBD found --\n\n");
                         gatt.discoverServices();
                     }
-                    else appendLine("-- Could not find OpenOBD module --\n");
+                    else appendLine("-- Could not find OpenOBD module --\n\n");
                     break;
 
                 // When Bluetooth disconnects, we disabled the UI
@@ -69,7 +95,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
             super.onServicesDiscovered(gatt, status);
 
             if (status == BluetoothGatt.GATT_FAILURE) {
-                appendLine("-- Could not connect to OpenOBD module --\n");
+                appendLine("-- Could not connect to OpenOBD module --\n\n");
                 return;
             }
 
@@ -83,18 +109,35 @@ public class MainActivity extends Activity implements View.OnClickListener {
             // Make sure TX notification is not enabled
             gatt.setCharacteristicNotification(mTX, false);
 
+            appendLine("-- Connected to OpenOBD module --\n\n");
             enableUI(true);
-            appendLine("-- Connected to OpenOBD module --\n");
         }
 
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
 
-            // print message to text view, this should only ever come from mRX
-            appendLine(characteristic.getStringValue(0));
-
             //TODO We could do some sort of message control as to reconstruct whole packets
+            String data = characteristic.getStringValue(0);
+            synchronized (rxLock) {
+                // As we receive data, we will continuously parse JSON
+                try {
+                    rxBuffer.write(data);
+                    rxBuffer.flush();
+
+                    // per spec, all JSON is line-delimited
+                    if (data.contains("\n")) {
+                        JSONObject response = JsonParser.parseObject(jsonReader);
+                        appendLine("-- Got Response --\n" +
+                                response.toString(1) +
+                                "-- End Response --\n\n");
+                    }
+
+                } catch (IOException | JSONException e) {
+                    Log.wtf(TAG, e);
+                    appendLine("-- Internal Error: " + e.getMessage() + " --\n\n");
+                }
+            }
         }
 
         @Override
@@ -106,30 +149,36 @@ public class MainActivity extends Activity implements View.OnClickListener {
             }
 
             // continue writing if we have more chunks
-            if (writeQueue.isEmpty()) writeInProgress = false;
+            if (txQueue.isEmpty()) txInProgress = false;
             else writeQueueFront();
         }
 
-        private void send(String message) {
+        private void send(JSONObject jobj) {
 
-            // We can only send 20 bytes per packet, so we partition each message
-            for (int len = message.length(); len > BLE_UART_TX_BUFFSIZE; len -= BLE_UART_TX_BUFFSIZE) {
-                writeQueue.add(message.substring(0, BLE_UART_TX_BUFFSIZE));
-                message = message.substring(BLE_UART_TX_BUFFSIZE);
+            // Per spec we will delimit JSON with newlines
+            String message = jobj.toString();
+            if (message.charAt(message.length() - 1) != '\n')
+                message += '\n';
+
+            // We can only send ~20 bytes per packet, so we partition each message
+            for (int len = message.length(); len > BLE_UART_BUFSIZE; len -= BLE_UART_BUFSIZE) {
+                txQueue.add(message.substring(0, BLE_UART_BUFSIZE));
+                message = message.substring(BLE_UART_BUFSIZE);
             }
 
             // lagging bit of message left over
-            if (!message.isEmpty()) writeQueue.add(message);
+            if (!message.isEmpty()) txQueue.add(message);
 
             // tell system to start sending the chunks if it isn't already
-            if (!writeInProgress && !writeQueue.isEmpty()) {
-                writeInProgress = true;
+            if (!txInProgress && !txQueue.isEmpty()) {
+                txInProgress = true;
                 writeQueueFront();
             }
         }
 
+        /* Sends the next TX unit in the cache */
         private void writeQueueFront() {
-            String chunk = writeQueue.poll();
+            String chunk = txQueue.poll();
             mTX.setValue(chunk);
             mGatt.writeCharacteristic(mTX);
         }
@@ -140,14 +189,13 @@ public class MainActivity extends Activity implements View.OnClickListener {
     public static final UUID UART_UUID = UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
     public static final UUID TX_UUID   = UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
     public static final UUID RX_UUID   = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
-    public static final int BLE_UART_TX_BUFFSIZE = 20;
+    public static final int BLE_UART_BUFSIZE = 20;
     public static final String TAG = "OpenOBD";
 
     /* UI elements */
-    private TextView mMessages;
-    private EditText mInput;
-    private Button   mSendButton;
-    private CheckBox mUseNewline;
+    private Spinner  mSpinner;
+    private Button   mRequestButton;
+    private TextView mUserLog;
 
     /* BLE state */
     private BluetoothAdapter mBLEAdapter;
@@ -164,17 +212,21 @@ public class MainActivity extends Activity implements View.OnClickListener {
         setContentView(R.layout.activity_main);
 
         // Grab references to UI elements.
-        mMessages = (TextView) findViewById(R.id.messages);
-        mInput = (EditText) findViewById(R.id.input);
-        mUseNewline = (CheckBox) findViewById(R.id.newline);
+        mUserLog = (TextView) findViewById(R.id.userLog);
+        mSpinner = (Spinner) findViewById(R.id.pidSpinner);
+        mRequestButton = (Button) findViewById(R.id.requestButton);
 
         // Enable auto-scroll in the TextView
-        mUseNewline.setMovementMethod(new ScrollingMovementMethod());
+        mUserLog.setMovementMethod(new ScrollingMovementMethod());
 
         // Disable the send button until we're connected.
-        mSendButton = (Button) findViewById(R.id.send);
-        mSendButton.setOnClickListener(this);
+        mRequestButton.setOnClickListener(this);
         enableUI(false);
+
+        // Add items to spinner
+        ArrayAdapter<OBDPID> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, OBDPID.values());
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        mSpinner.setAdapter(adapter);
 
         // Initialize Bluetooth
         mOpenOBD = null;
@@ -186,7 +238,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         // Make sure BLE is enabled
         mBLEAdapter = BluetoothAdapter.getDefaultAdapter();
         if (mBLEAdapter == null || !mBLEAdapter.isEnabled()) {
-            appendLine("-- Bluetooth must be enabled --\n");
+            appendLine("-- Bluetooth must be enabled --\n\n");
         }
         else {
             // find OpenOBD device
@@ -199,10 +251,11 @@ public class MainActivity extends Activity implements View.OnClickListener {
             }
 
             if (mOpenOBD == null) {
-                appendLine("-- OpenOBD module not paired, please pair --\n");
+                appendLine("-- OpenOBD module not paired, please pair --\n\n");
             }
             else {
                 // Connect to OpenOBD (Async)
+                appendLine("-- Searching for OpenOBD module --\n\n");
                 mUART = new UARTGattHandler();
                 mGatt = mOpenOBD.connectGatt(this, true, mUART);
             }
@@ -221,25 +274,30 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
     /* Write text to the text view */
     private void appendLine(final CharSequence text) {
-        runOnUiThread(() -> mMessages.append(text));
+        runOnUiThread(() -> mUserLog.append(text));
     }
 
     private void enableUI(final boolean enable) {
         runOnUiThread(() -> {
-            mSendButton.setClickable(enable);
-            mSendButton.setEnabled(enable);
+            mRequestButton.setClickable(enable);
+            mRequestButton.setEnabled(enable);
         });
     }
 
     // Handler for mouse click on the send button.
     public void onClick(View view) {
-        String message = mInput.getText().toString();
-        if (message.isEmpty()) return;
+        OBDPID selection = (OBDPID) mSpinner.getSelectedItem();
 
-        mInput.setText("");
-        mInput.setHint("Sent: " + message);
-        if (mUseNewline.isChecked())
-            message += "\r\n";
-        mUART.send(message);
+        JSONObject jsonRequest = new JSONObject();
+        try {
+            jsonRequest.put("pid", selection.getPID());
+            appendLine("-- Requesting " + selection.toString() + " --\n");
+            appendLine(jsonRequest.toString(1) + "\n-- End Request --\n\n");
+            mUART.send(jsonRequest);
+        }
+        catch (JSONException e) {
+            appendLine("-- Internal Error: " + e.getMessage() + "\n");
+            Log.wtf(TAG, e);
+        }
     }
 }
