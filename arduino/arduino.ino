@@ -32,12 +32,12 @@ int main(void) {
 
   // bluetooth initialization
   bluetooth_init();
-  bluetooth_enable();
 
   // API handle
   OpenAPI apiHandle;
 
   // main loop
+  bluetooth_enable();
   while (1) {
     bluetooth_handle();
     apiHandle.process(bleUART);
