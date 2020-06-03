@@ -7,6 +7,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.sql.Timestamp;
 
 /* This class parses JSON data for the API */
 public class JsonParser {
@@ -28,11 +29,13 @@ public class JsonParser {
                     String number = reader.nextString();
                     if (key.equals("pid"))
                         jobj.put("pid", Integer.valueOf(number));
+                    else if (key.equals("seq"))
+                        jobj.put("seq", Integer.valueOf(number));
                     else if (number.contains("."))
                         jobj.put(key, Double.valueOf(number));
                     else
                         jobj.put(key, Long.valueOf(number));
-
+                    break;
                 case BOOLEAN:
                     jobj.put(key, reader.nextBoolean());
                 default:

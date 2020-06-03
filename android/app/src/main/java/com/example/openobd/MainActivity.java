@@ -20,10 +20,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
+import java.io.StringReader;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
@@ -36,8 +33,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
         /* Queues for UART RX/TX */
         private Queue<String> txQueue;
-        private OutputStreamWriter rxBuffer;
-        private JsonReader jsonReader;
+        private StringBuilder rxBuffer;
 
         /* Keep track of when a read and write is happening */
         private boolean txInProgress;
@@ -47,18 +43,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
             rxLock = new Object();
             txInProgress = false;
             txQueue = new ConcurrentLinkedQueue<>();
-            try {
-                // make character streams
-                // data flows from UART -> OutputStream -> InputStream -> JsonStream
-                PipedOutputStream pos = new PipedOutputStream();
-                PipedInputStream pis = new PipedInputStream(pos);
-
-                rxBuffer = new OutputStreamWriter(pos);
-                jsonReader = new JsonReader(new InputStreamReader(pis));
-            } catch (IOException e) {
-                Log.wtf(TAG, e);
-                finish();
-            }
+            rxBuffer = new StringBuilder();
         }
 
         @Override
@@ -119,22 +104,23 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
             //TODO We could do some sort of message control as to reconstruct whole packets
             String data = characteristic.getStringValue(0);
+            Log.d(TAG, "Read: " + data);
             synchronized (rxLock) {
                 // As we receive data, we will continuously parse JSON
                 try {
-                    rxBuffer.write(data);
-                    rxBuffer.flush();
+                    rxBuffer.append(data);
 
                     // per spec, all JSON is line-delimited
                     if (data.contains("\n")) {
-                        JSONObject response = JsonParser.parseObject(jsonReader);
+                        JSONObject response = JsonParser.parseObject(new JsonReader(new StringReader(rxBuffer.toString())));
                         appendLine("-- Got Response --\n" +
                                 response.toString(1) +
-                                "-- End Response --\n\n");
+                                "\n\n");
                     }
 
                 } catch (IOException | JSONException e) {
                     Log.wtf(TAG, e);
+                    Log.d(TAG, "Buffer contents:\n");
                     appendLine("-- Internal Error: " + e.getMessage() + " --\n\n");
                 }
             }
@@ -206,6 +192,9 @@ public class MainActivity extends Activity implements View.OnClickListener {
     private UARTGattHandler mUART;
     private BluetoothGattCharacteristic mRX, mTX;
 
+    /* Yay, globals */
+    private int sequenceCounter;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -234,6 +223,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         mRX = null;
         mTX = null;
         mGatt = null;
+        sequenceCounter = 0;
 
         // Make sure BLE is enabled
         mBLEAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -274,7 +264,11 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
     /* Write text to the text view */
     private void appendLine(final CharSequence text) {
-        runOnUiThread(() -> mUserLog.append(text));
+        runOnUiThread(() -> {
+            synchronized (mUserLog) {
+                mUserLog.append(text);
+            }
+        });
     }
 
     private void enableUI(final boolean enable) {
@@ -291,8 +285,9 @@ public class MainActivity extends Activity implements View.OnClickListener {
         JSONObject jsonRequest = new JSONObject();
         try {
             jsonRequest.put("pid", selection.getPID());
+            jsonRequest.put("seq", sequenceCounter++);
             appendLine("-- Requesting " + selection.toString() + " --\n");
-            appendLine(jsonRequest.toString(1) + "\n-- End Request --\n\n");
+            appendLine(jsonRequest.toString(1) + "\n\n");
             mUART.send(jsonRequest);
         }
         catch (JSONException e) {
