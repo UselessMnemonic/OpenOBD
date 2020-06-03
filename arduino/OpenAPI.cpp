@@ -43,7 +43,10 @@ void OpenAPI::process(Stream& clientStream) {
     SerialUSB.print("\r\n-- End Reply --\r\n");
     
     serializeJson(jsonData, _buffer);
-    clientStream.write(_buffer, strlen(_buffer));
+    size_t len = strlen(_buffer);
+    _buffer[len] = '\n';
+    _buffer[len + 1] = 0;
+    clientStream.write(_buffer, len + 1);
 
     jsonData.clear();
     jsonData.garbageCollect();
