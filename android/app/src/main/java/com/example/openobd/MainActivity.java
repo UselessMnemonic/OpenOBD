@@ -116,11 +116,11 @@ public class MainActivity extends Activity implements View.OnClickListener {
                         appendLine("-- Got Response --\n" +
                                 response.toString(1) +
                                 "\n\n");
+                        rxBuffer = new StringBuilder();
                     }
 
                 } catch (IOException | JSONException e) {
                     Log.wtf(TAG, e);
-                    Log.d(TAG, "Buffer contents:\n");
                     appendLine("-- Internal Error: " + e.getMessage() + " --\n\n");
                 }
             }
