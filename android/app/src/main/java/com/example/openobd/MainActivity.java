@@ -1,12 +1,16 @@
 package com.example.openobd;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.text.method.ScrollingMovementMethod;
 import android.util.JsonReader;
 import android.util.Log;
@@ -57,7 +61,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
                 // When Bluetooth connects
                 case BluetoothGatt.STATE_CONNECTED:
                     if (status == BluetoothGatt.GATT_SUCCESS) {
-                        appendLine("-- OpenOBD found --\n\n");
+                        appendLine("-- OpenOBD found --\n");
                         gatt.discoverServices();
                     }
                     else appendLine("-- Could not find OpenOBD module --\n\n");
@@ -228,7 +232,10 @@ public class MainActivity extends Activity implements View.OnClickListener {
         // Make sure BLE is enabled
         mBLEAdapter = BluetoothAdapter.getDefaultAdapter();
         if (mBLEAdapter == null || !mBLEAdapter.isEnabled()) {
-            appendLine("-- Bluetooth must be enabled --\n\n");
+            new AlertDialog.Builder(this)
+                    .setMessage("You must have Bluetooth enabled first.")
+                    .setNeutralButton("OK", (DialogInterface dialog, int which) -> finish())
+                    .show();
         }
         else {
             // find OpenOBD device
@@ -241,11 +248,23 @@ public class MainActivity extends Activity implements View.OnClickListener {
             }
 
             if (mOpenOBD == null) {
-                appendLine("-- OpenOBD module not paired, please pair --\n\n");
+                new AlertDialog.Builder(this)
+                        .setMessage("You must pair with the OpenOBD module")
+                        .setNeutralButton("OK", (DialogInterface dialog, int which) -> {
+                            startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+                        })
+                        .show();
             }
             else {
                 // Connect to OpenOBD (Async)
-                appendLine("-- Searching for OpenOBD module --\n\n");
+                appendLine("************************************\n" +
+                        "*  Your device will automatically  *\n" +
+                        "*  connect and reconnect to the    *\n" +
+                        "*  module when available. You can  *\n" +
+                        "*  make several requests in rapid  *\n" +
+                        "*  succession, but some may drop.  *\n" +
+                        "************************************\n");
+                appendLine("-- Searching for OpenOBD module --\n");
                 mUART = new UARTGattHandler();
                 mGatt = mOpenOBD.connectGatt(this, true, mUART);
             }
@@ -291,7 +310,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
             mUART.send(jsonRequest);
         }
         catch (JSONException e) {
-            appendLine("-- Internal Error: " + e.getMessage() + "\n");
+            appendLine("\n-- Internal Error: " + e.getMessage() + "\n\n");
             Log.wtf(TAG, e);
         }
     }
