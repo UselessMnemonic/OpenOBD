@@ -36,7 +36,7 @@ uint16_t BLEConnHandle,
          UARTRXCharHandle;
 
 // Bluetooth MAC Address
-uint8_t BDADDR[] = {0x12, 0x34, 0x00, 0xE1, 0x80, 0x22};
+uint8_t BDADDR[] = {0xE8, 0xE1, 0xD5, 0xE1, 0x73, 0xCD};
 
 // Bluetooth Names
 const char LOCAL_NAME[] = {AD_TYPE_COMPLETE_LOCAL_NAME, 'O', 'p', 'e', 'n', 'O', 'B', 'D'};
@@ -112,7 +112,7 @@ void OnReadRequest(uint16_t handle) {
 }
 
 // when the UART attribute is modified, we should notify the applicaiton
-void OnAttributeModified(uint16_t handle, uint8_t data_length, uint8_t *att_data) {
+void OnAttributeModified(uint16_t handle, uint8_t data_length, uint8_t* att_data) {
   if (handle == UARTTXCharHandle + 1) {
     int i;
     for (i = 0; i < data_length; i++) {
@@ -125,12 +125,10 @@ void OnAttributeModified(uint16_t handle, uint8_t data_length, uint8_t *att_data
 }
 
 // occurs when a point-to-point connection is established
-void OnConnectionComplete(uint8_t addr[6], uint16_t connection_handle) {
+void OnConnectionComplete(uint8_t* addr, uint16_t connection_handle) {
   printf("BLE: Connected to MAC ");
-  for (int i = 5; i > 0; i--) {
-    printf("%02X-", addr[i]);
-  }
-  printf("%02X -> #%hu\r\n", addr[0], connection_handle);
+  for (int i = 5; i > 0; i--) printf("%02X:", (int)addr[i]);
+  printf("%02X (#%hu)\r\n", (int)addr[0], connection_handle);
 
   BLEConnHandle = connection_handle;
   do_unconnectable = 1;
@@ -154,10 +152,10 @@ void OnAuthorizationRequest(uint16_t handle) {
 }
 
 // the real meat and potatoes of the loop logic
-extern "C" void HCI_Event_CB(void *pckt);
-void HCI_Event_CB(void *pckt) {
-  hci_uart_pckt *hci_pckt = (hci_uart_pckt *)pckt;
-  hci_event_pckt *event_pckt = (hci_event_pckt*)hci_pckt->data;
+extern "C" void HCI_Event_CB(void* pckt);
+void HCI_Event_CB(void* pckt) {
+  hci_uart_pckt* hci_pckt = (hci_uart_pckt*) pckt;
+  hci_event_pckt* event_pckt = (hci_event_pckt*) hci_pckt->data;
 
   if (hci_pckt->type != HCI_EVENT_PKT) return;
 
@@ -169,10 +167,10 @@ void HCI_Event_CB(void *pckt) {
     }
     
     case EVT_LE_META_EVENT: {
-      evt_le_meta_event *evt = (evt_le_meta_event *)event_pckt->data;
+      evt_le_meta_event* evt = (evt_le_meta_event*) event_pckt->data;
       switch (evt->subevent) {
         case EVT_LE_CONN_COMPLETE: {
-          evt_le_connection_complete *cc = (evt_le_connection_complete *)evt->data;
+          evt_le_connection_complete* cc = (evt_le_connection_complete*) evt->data;
           OnConnectionComplete(cc->peer_bdaddr, cc->handle);
           break;
         }
