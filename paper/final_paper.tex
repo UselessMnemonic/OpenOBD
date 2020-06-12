@@ -61,11 +61,15 @@ Fundamentally, the core problem here is that most vehicles do not operate on a s
 
 We can further sub-divide this problem into two classes: physical and electron. For example, if you want to buy a new radio for your car, you need to find one that both fits physically into your dashboard and also will connect to your car's audio system. On modern cars, your \say{infotainment} system may also contain many of the controls for your vehicle, or also display select diagnostic information, which means it must interface with whatever wiring and information specification the manufacturer provides. Our goal will be to tackle the latter issue, and we believe that, free of a requirement to match proprietary data connections, it will be easier to adapt a generic product to fit physically in a variety of vehicles. Even on modern vehicles with an Apple CarPlay or Android Auto are often difficult to upgrade and will not have access to a full range of information, although they are a step in the right direction.
 
+Currently, the market is basically limited to infotainment systems. But we imagine that, with a unified platform to provide access to data, it might be possible to expand the market for other devices which can display data. It could be possible to project navigation and speedometer data directly onto your windshield, so you can keep your eyes on the road and also see where you are going. You could wear augmented reality glasses which highlight your car's location so you never get lost in a parking lot again. Your music player could change which playlist it's using based on your speed or location. You could be notified of an engine misfire when it happens. Your oil pressure could be read directly. You could use a machine learning algorithm to train yourself to drive more economically. We originally pitched ideas just like these, but kept running into the same issue: there is no standardized way to access your car's data for applications such as these, and if you developed a stack just for interfacing with the car then you could have to pick-and-choose which to use.
+
 \subsection{The Goal}
 
 We believe that someone looking to upgrade their vehicle should simply be able to go online or to a store, browse products that solve a problem they have, and then be able to use this in their car. They should not have to be locked-in to a given vendor or system, nor should they have to fear that they will lose access to their data or control of their car. As vehicles trend increasingly towards being \say{smart}, \say{Internet of Things} objects, the issues inherent in the modern smart-device ecosystem creep in to a traditionally very stable platform, and nobody should have to worry about their car being disabled or damaged remotely via exposure to a broader network. 
 
 Additionally, as creators, we want more freedom to get data from our cars and to experiment with solutions to the problems with have. This is the basis of innovation, and currently any individual hoping to create a new product will have to navigate a technical minefield just to develop a one-off product for their own vehicle. A single man working alone ought to be able to create a solution and share this with others in whatever way they see fit. This is a fundamental aspect of \say{hacker culture}, and by lowering the bar to creating novel solutions we hope to spur innovation in this market.
+
+Additionally, we think it's important that any third-party devices not have to compete over usage of the OBD-II port. By providing this as a modular part of a larger theoretical stack, free other devices to worry about doing their particular job correctly. 
 
 \subsection{Our Solution}
 
@@ -87,6 +91,22 @@ With these goals in mind, we were able to take a common-sense approach to the de
 
 \end{description}
 
+The Unix Philosophy is as follows:
+
+\begin{enumerate}
+  \item
+  Write programs that do one thing and do it well.
+
+  \item
+  Write programs to work together.
+
+  \item
+  Write programs to handle text streams, because that is a universal interface.
+
+\end{enumerate}
+
+We wish to expand this philosophy into the domain of the Internet of Things.
+
 \section{Technical Material}
 
 \subsection{Prior Work}
@@ -103,8 +123,13 @@ With these goals in mind, we were able to take a common-sense approach to the de
 
 \subsection{Platform}
 
-\todo Why we chose TinyZero and ELM.
+For our Microcontroller, we selected the TinyZero by TinyCircuits. This is an ARM microcontroller that is modular and designed for prototyping. It is very small, which makes it ideal for prototyping a project that needs to fit into a compact package. The platform has excellent support for many embedded libraries, especially those designed for Arduino, and it supports a modular system of \say{stacking} modules, whereby a number of separate add-ons can simply be attached to each other, like a simplified Arduino HAT system. This makes it perfect for expanding functionality as we continue to prototype.
 
+One decision we had to make was whether we implement our own OBD-II communicator. We ultimately chose not to do this for a variety of reasons. The OBD-II specification covers how data should be stored and transmitted, as well as what kind of data should be tracked and made available. A number of different, competing specifications for actually retrieving this data exist, and they vary greatly in voltage, pinout, and data format. This makes interpreting the data difficult and potentially hazardous to the vehicle if not done correctly. It would also have been more work than the rest of the project combined, and likely take up the majority of the time. Since commercial solutions for this connector exist, we decided it was better to focus on the novel aspects of our project and not to re-invent the wheel. After a survey of the market, we found two decent options, both of which use an ELM347 chip to handle the bulk of the work. After comparing options, a dongle by Freematics was cheaper and provided additional functionality built right in, so it became the obvious choice. Unfortunately, it did not arrive before the end of the quarter, likely due to shipping delays.
+
+For communicating with other devices, we chose Bluetooth. It's the most common option for device-to-device connections, and modern Bluetooth with Low Energy (BLE) is quite efficient, which is important for a device which can potentially leech your car's battery. Ad-hoc Wi-Fi is just not efficient nor particularly secure, and interfacing over it would have been unnecessarily difficult for no additional advantages. It was important that consumer smartphones be able to interface directly with the OpenOBD module.
+
+\newpage
 \section{Milestones}
 
 \begin{description}
@@ -121,27 +146,29 @@ With these goals in mind, we were able to take a common-sense approach to the de
 
 \subsection{Read Data}
 
-\todo Explain how we wrote to conform to provided ELM driver and how we didn't get the actual connector delivered.
+While we did not have a chance to test this (see the issues section below), we were able to use the ELM driver provided by Freematics for use with their dongle to implement wrappers which should read and write the data. The ELM utilizes UART to communicate with the microcontroller. A series of PIDs can be transmitted, and then a read will be performed via the OBD-II port. The result is then returned and passed to another wrapper to format a JSON response packet.
 
 \subsection{Write Data}
 
-\todo Explain how we wrote to conform to provided ELM driver and how we didn't get the actual connector delivered.
+Similar to Read Data, we could not test this, but we have implemented a dummy function in accordance with the documentation.
 
 \subsection{Expose Data}
 
-\todo Explain the API and JSON implementation.
+Our system is built around an API which processes and returns JSON structures. We expose the data by providing a clean, consistent specification for what fields to send and what sort of response to expect. Instead of having to know every PID that is implemented, you simply send a request for the fields you would like read and they, or an error, will be returned. This works, and while it is missing some of the expanded functionality of the Freematics dongle, the standard PIDs are all supported.
 
 \subsection{Encrypt Data}
 
-\todo done via RSA encryption. Explain how this is asymmetric. Explain how this  verifies the user is allowed to make a request, and while it does help protect the data much of that lies within the Bluetooth spec. So there's two layers of encryption here.
+Upon activating the device, you will need to pair your device with it. This is done by generating an RSA keypair. The \say{public} key is then sent over (encrypted) Bluetooth to your device. This certificate can be shared to other devices you want to have access to your OpenOBD dongle. This provides authentication of the user/device. The Bluetooth spec itself provides encryption based around a PIN which the user must enter when it establishes a connection. This way, the data is encrypted and all identities can be verified. Since the device will automatically decrypt and encrypt with its private key, data sent elsewhere will be useless and requests from unauthorized users will likewise be invalid commands.
 
 \subsection{Allow Modifying Vehicle State}
 
-\todo Dropped because the writes aren't very important and sanitizing inputs requires thought, so it got backburnered.
+This is mostly unimplemented. While we have a specification for how to format a JSON write query, there is currently no wrapper to handle and format this data on the OpenOBD platform. The reason for this is that it is relatively low-priority. There are only a few writes you often want to do, such as clearing an error code, but writing is also the biggest source of vulnerabilities. Implementing a few simple writes would be possible, but it was decided to focus on other pathways and expand this later. Sanity-checking inputs is important.
 
 \subsection{Additional Sensors}
 
-\todo Say we added a GPS and some storage to facilitate GPS and prepare for adding SIM card support.
+We have added a GPS module and a storage module to our TinyZero. This allows tracking the vehicle's location remotely. We have plans to add a SIM Card module, to allow vehicle status to be tracked via the internet, but we do not have one of these modules. The Freematic UART dongle also allows for sensing battery levels, and we have implemented preliminary support for this, though it has gone untested. This and a few other optional PIDs exist as part of the ELM chip.
+
+\section{Future Work}
 
 \section{Conclusion}
 
