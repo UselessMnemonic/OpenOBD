@@ -42,6 +42,9 @@ uint8_t BDADDR[] = {0xE8, 0xE1, 0xD5, 0xE1, 0x73, 0xCD};
 const char LOCAL_NAME[] = {AD_TYPE_COMPLETE_LOCAL_NAME, 'O', 'p', 'e', 'n', 'O', 'B', 'D'};
 const char BDNAME[] = "OpenOBD";
 
+// forward declarations
+void print_status(uint8_t bles, const char* msg);
+
 /*=== BLE API ========================*/
 
 // makes the device discoverable
@@ -61,7 +64,7 @@ void setConnectable(void) {
   if (ret == BLE_STATUS_SUCCESS)
     printf("BLE: Module is now discoverable\r\n");
   else
-    printf("BLE: Could not enter discoverable mode (Err: 0x%02X)\r\n", ret);
+    print_status(ret, "BLE: Could not enter discoverable mode: ");
   do_connectable = 0;
 }
 
@@ -75,7 +78,7 @@ void setNonConnectable(void) {
   if (ret == BLE_STATUS_SUCCESS)
     printf("BLE: Module is now undiscoverable\r\n");
   else
-    printf("BLE: Could not enter undiscoverable mode (Err: 0x%02X)\r\n", ret);
+    print_status(ret, "BLE: Could not enter undiscoverable mode: ");
   
   aci_hal_device_standby();
   do_unconnectable = 0;
@@ -139,6 +142,15 @@ void OnDisconnectionComplete(void) {
   do_connectable = 1;
 }
 
+// occurs when an authorization request is recieved
+void OnAuthorizationRequest(uint16_t handle) {
+  tBleStatus ret;
+  if (BLEConnHandle != 0) {
+    ret = aci_gap_authorization_response(handle, CONNECTION_AUTHORIZED);
+    if (ret != BLE_STATUS_SUCCESS) print_status(ret, "Error during auth response: ");
+  }
+}
+
 // the real meat and potatoes of the loop logic
 extern "C" void HCI_Event_CB(void* pckt);
 void HCI_Event_CB(void* pckt) {
@@ -167,19 +179,31 @@ void HCI_Event_CB(void* pckt) {
     }
     
     case EVT_VENDOR: {
-      evt_blue_aci* blue_evt = (evt_blue_aci*) event_pckt->data;
+      evt_blue_aci *blue_evt = (evt_blue_aci*) event_pckt->data;
       switch (blue_evt->ecode) {
         case EVT_BLUE_GATT_READ_PERMIT_REQ: {
-          evt_gatt_read_permit_req* pr = (evt_gatt_read_permit_req*) blue_evt->data;
+          evt_gatt_read_permit_req *pr = (evt_gatt_read_permit_req*) blue_evt->data;
           OnReadRequest(pr->attr_handle);
           break;
         }
         case EVT_BLUE_GATT_ATTRIBUTE_MODIFIED: {
-          evt_gatt_attr_modified_IDB05A1* evt = (evt_gatt_attr_modified_IDB05A1*) blue_evt->data;
+          evt_gatt_attr_modified_IDB05A1 *evt = (evt_gatt_attr_modified_IDB05A1*) blue_evt->data;
           OnAttributeModified(evt->attr_handle, evt->data_length, evt->att_data);
           break;
         }
       }
+      break;
+    }
+
+    case EVT_BLUE_GAP_AUTHORIZATION_REQUEST: {
+      evt_gap_author_req *auth_evt = (evt_gap_author_req*) event_pckt->data;
+      OnAuthorizationRequest(auth_evt->conn_handle);
+      break;
+    }
+
+    case EVT_BLUE_GAP_PAIRING_CMPLT: {
+      evt_gap_pairing_cmplt *pair_evt = (evt_gap_pairing_cmplt*) event_pckt->data;
+      // TODO: OnPairingComplete();
       break;
     }
     
@@ -187,7 +211,8 @@ void HCI_Event_CB(void* pckt) {
 }
 
 // prints status codes to readable form
-void print_status(uint8_t bles) {
+void print_status(uint8_t bles, const char* msg) {
+  printf("BLE: %s", msg);
   switch (bles) {
     //case ERR_CMD_SUCCESS: printf("ERR_CMD_SUCCESS"); break;
     case BLE_STATUS_SUCCESS: printf("BLE_STATUS_SUCCESS"); break;
@@ -249,6 +274,7 @@ void print_status(uint8_t bles) {
     case BLE_STATUS_NULL_PARAM: printf("BLE_STATUS_NULL_PARAM"); break;
     default: printf("Unknown Status"); break;
   }
+  printf("\r\n");
 }
 
 /*=== PUBLIC API =====================*/
@@ -266,50 +292,34 @@ void bluetooth_init() {
   BlueNRG_RST();
 
   /* Edit configuration */
-  ret = aci_hal_write_config_data(CONFIG_DATA_PUBADDR_OFFSET, 6, BDADDR);
-  while (ret != BLE_STATUS_SUCCESS) {
-    printf("aci_hal_write_config_data failed: ");
-    print_status(ret);
-    printf("\r\n");
-  }
+  ret = aci_hal_write_config_data(CONFIG_DATA_PUBADDR_OFFSET, CONFIG_DATA_PUBADDR_LEN, BDADDR);
+  while (ret != BLE_STATUS_SUCCESS) print_status(ret, "aci_hal_write_config_data failed: ");
 
   ret = aci_gatt_init();
-  while (ret != BLE_STATUS_SUCCESS) {
-    printf("aci_gatt_init failed: ");
-    print_status(ret);
-    printf("\r\n");
-  }
+  while (ret != BLE_STATUS_SUCCESS) print_status(ret, "aci_gatt_init failed: ");
   
   ret = aci_gap_init_IDB05A1(GAP_PERIPHERAL_ROLE_IDB05A1, 0, 0x07, &service_handle, &dev_name_char_handle, &appearance_char_handle);
-  while (ret != BLE_STATUS_SUCCESS) {
-    printf("aci_gap_init_IDB05A1 failed: ");
-    print_status(ret);
-    printf("\r\n");
-  }
+  while (ret != BLE_STATUS_SUCCESS) print_status(ret, "aci_gap_init_IDB05A1 failed: ");
 
   ret = aci_gatt_update_char_value(service_handle, dev_name_char_handle, 0, strlen(BDNAME), (uint8_t *)BDNAME);
-  while (ret != BLE_STATUS_SUCCESS) {
-    printf("aci_gatt_update_char_value failed: ");
-    print_status(ret);
-    printf("\r\n");
-  }
+  while (ret != BLE_STATUS_SUCCESS) print_status(ret, "aci_gatt_update_char_value failed: ");
 
   ret = Add_UART_Service();
-  while (ret != BLE_STATUS_SUCCESS) {
-    printf("Error while adding UART service: ");
-    print_status(ret);
-    printf("\r\n");
-  }
+  while (ret != BLE_STATUS_SUCCESS) print_status(ret, "Error while adding UART service: ");
 
   // +4 dBm output power
   ret = aci_hal_set_tx_power_level(1, 3);
-  while (ret != BLE_STATUS_SUCCESS) {
-    printf("Error while setting power output: ");
-    print_status(ret);
-    printf("\r\n");
-  }
+  while (ret != BLE_STATUS_SUCCESS) print_status(ret, "Error while setting power output: ");
 
-  do_unconnectable = 1;
+  ret = aci_gap_set_io_capability(IO_CAP_DISPLAY_YES_NO);
+  while (ret != BLE_STATUS_SUCCESS) print_status(ret, "Error while setting IO capability: ");
+
+  uint8_t oob_data[16];
+  ret = aci_gap_set_auth_requirement(MITM_PROTECTION_REQUIRED, OOB_AUTH_DATA_ABSENT, oob_data, MIN_ENCRY_KEY_SIZE,
+                                     MAX_ENCRY_KEY_SIZE, USE_FIXED_PIN_FOR_PAIRING, 123456, BONDING);
+  while (ret != BLE_STATUS_SUCCESS) print_status(ret, "Error while setting auth requirement: ");
+
+  bluetooth_disable();
 }
 
 void bluetooth_handle() {
@@ -320,7 +330,7 @@ void bluetooth_handle() {
   }
 }
 
-uint8_t bluetooth_uart_tx(uint8_t *buf, uint8_t len) {
+uint8_t bluetooth_uart_tx(uint8_t *buf, uint32_t len) {
 
   uint8_t nextLen;
   tBleStatus ret;
@@ -328,17 +338,15 @@ uint8_t bluetooth_uart_tx(uint8_t *buf, uint8_t len) {
   
   while(len > 0) {
     
-    nextLen = (BLE_UART_TX_BUFFSIZE < len) ? (BLE_UART_TX_BUFFSIZE) : len;
+    nextLen = (len > BLE_UART_TX_BUFFSIZE) ? (BLE_UART_TX_BUFFSIZE) : (uint8_t) len;
     ret = aci_gatt_update_char_value(UARTServHandle, UARTRXCharHandle, 0, nextLen, buf);
     
     if (ret != BLE_STATUS_SUCCESS) {
-      printf("Error while updating UART: ");
-      print_status(ret);
-      printf("\r\n");
+      print_status(ret, "Error while updating UART: ");
       return 0;
     }
     
-    len = len - nextLen;
+    len = len - (uint32_t)nextLen;
     buf = (uint8_t*)(buf + nextLen);
     
   }

@@ -19,7 +19,7 @@ void bluetooth_handle();
  * 
  * @return     1 if the transmission was successful, 0 otherwise
  */
-uint8_t bluetooth_uart_tx(uint8_t *buf, uint8_t len);
+uint8_t bluetooth_uart_tx(uint8_t *buf, uint32_t len);
 
 /**
  * Callback when a UART transmission is pending from a connected device

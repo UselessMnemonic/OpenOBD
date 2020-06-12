@@ -3,6 +3,9 @@
 #include <SPI.h>
 #include <stdio.h>
 
+#include "UartStream.h"
+#include "OpenAPI.h"
+
 // libc functions
 extern "C" void __libc_init_array(void);
 extern "C" int _write(int fd, const void *buf, size_t count) {
@@ -10,10 +13,10 @@ extern "C" int _write(int fd, const void *buf, size_t count) {
   return 0;
 }
 
-// event handlers
-void bluetooth_on_uart_rx(uint8_t *buf, uint8_t len) {
-  printf("BLE [%d]: %s\r\n", len, (const char*)buf);
-  //oobd_process_command(...)
+// UART stream and BLE hook
+UartStream bleUART;
+void bluetooth_on_uart_rx(uint8_t* buf, uint8_t len) {
+    bleUART.notify(buf, len);
 }
 
 // burn, baby! burn!
@@ -29,10 +32,14 @@ int main(void) {
 
   // bluetooth initialization
   bluetooth_init();
-  bluetooth_enable();
+
+  // API handle
+  OpenAPI apiHandle;
 
   // main loop
+  bluetooth_enable();
   while (1) {
     bluetooth_handle();
+    apiHandle.process(bleUART);
   }
 }
