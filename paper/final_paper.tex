@@ -120,15 +120,15 @@ We wish to expand this philosophy into the domain of the Internet of Things.
 \includegraphics[width=0.7\linewidth]{pathway.png}
 \end{center}
 
-\todo High-level description of system.
+\todo High-level description of system. Why we chose JSON. How to ensure the device is neutral, secure, and trustworthy. Security considerations. API structure. Etc.
+
+For communicating with other devices, we chose Bluetooth. It's the most common option for device-to-device connections, and modern Bluetooth with Low Energy (BLE) is quite efficient, which is important for a device which can potentially leech your car's battery. Ad-hoc Wi-Fi is just not efficient nor particularly secure, and interfacing over it would have been unnecessarily difficult for no additional advantages. It was important that consumer smartphones be able to interface directly with the OpenOBD module.
 
 \subsection{Platform}
 
 For our Microcontroller, we selected the TinyZero by TinyCircuits. This is an ARM microcontroller that is modular and designed for prototyping. It is very small, which makes it ideal for prototyping a project that needs to fit into a compact package. The platform has excellent support for many embedded libraries, especially those designed for Arduino, and it supports a modular system of \say{stacking} modules, whereby a number of separate add-ons can simply be attached to each other, like a simplified Arduino HAT system. This makes it perfect for expanding functionality as we continue to prototype.
 
 One decision we had to make was whether we implement our own OBD-II communicator. We ultimately chose not to do this for a variety of reasons. The OBD-II specification covers how data should be stored and transmitted, as well as what kind of data should be tracked and made available. A number of different, competing specifications for actually retrieving this data exist, and they vary greatly in voltage, pinout, and data format. This makes interpreting the data difficult and potentially hazardous to the vehicle if not done correctly. It would also have been more work than the rest of the project combined, and likely take up the majority of the time. Since commercial solutions for this connector exist, we decided it was better to focus on the novel aspects of our project and not to re-invent the wheel. After a survey of the market, we found two decent options, both of which use an ELM347 chip to handle the bulk of the work. After comparing options, a dongle by Freematics was cheaper and provided additional functionality built right in, so it became the obvious choice. Unfortunately, it did not arrive before the end of the quarter, likely due to shipping delays.
-
-For communicating with other devices, we chose Bluetooth. It's the most common option for device-to-device connections, and modern Bluetooth with Low Energy (BLE) is quite efficient, which is important for a device which can potentially leech your car's battery. Ad-hoc Wi-Fi is just not efficient nor particularly secure, and interfacing over it would have been unnecessarily difficult for no additional advantages. It was important that consumer smartphones be able to interface directly with the OpenOBD module.
 
 \newpage
 \section{Milestones}
@@ -184,9 +184,19 @@ Our platform, though incomplete, serves as a functional proof-of-concept for our
 \end{figure}
 \end{centering}
 
+Preliminary results for testing security were good. If one assumes a malicious agent is able to steal the user's Bluetooth PIN or otherwise exploit a flaw which allows them to sniff the Bluetooth packets, they still cannot decode a message encrypted with either of the RSA keys. Likewise, a phony command without the proper authentication is ignored. However, security is non-trivial and ideally, if we were to launch this as a real product, we would want to have our implementation audited professionally.
+
+Though we are using dummy data instead of the actual UART connection to read data from a real vehicle, the device can process requests rapidly. We expect the ELM to be the bottleneck for requests, however, and we are eager to see what kind of throughput we can get on a real vehicle.
+
+The device's size, even in prototype form, is small enough to fit within an OBD-II port. The connector itself is significantly larger, and we believe with a dedicated Printed Circuit Board (PCB) we could make it even smaller. This would make it the smallest such device on the market. Additionally, we used our experience optimizing the TinyZero hardware to make it incredibly energy efficient, and it often draws only 0.001 mA of current in its standby state.
+
 \section{Future Work}
 
+\todo We still need to actually add and test the Freematics Dongle. We'd like to add SIM Card support. We'd like to add support for expanded diagnostics like BMW and Merceded have, but they're proprietary so it wouldn't be easy. We'd like to expand the app to better support diagnostics. Maybe even write an Android library to make using the API even easier for developers. Write an iOS app at some point. Add Tasker and IFTTT support to our app. We'd like to design an enclosure for it.
+
 \section{Conclusion}
+
+\todo We're disappointed we couldn't actually test it on a real car because we never got the dongle. We had a demo planned where we would drive around and show output live via a webpage. We think there's real potential here. We want to keep working on this. We learned a lot, especially about encryption. We still have a lot to learn about bringing a product to market. After this, we might try building a product that relies on this one and see how it goes. Maybe make some tweaks if we find it's less developer-friendly than we'd like. Overall conclusion: we think this is a viable product and we would use it ourselves, and probably will.
 
 \section{References}
 
