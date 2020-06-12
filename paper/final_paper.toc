@@ -1,0 +1,18 @@
+\contentsline {section}{\numberline {1}Abstract}{2}% 
+\contentsline {section}{\numberline {2}Introduction}{2}% 
+\contentsline {subsection}{\numberline {2.1}The Problem}{2}% 
+\contentsline {subsection}{\numberline {2.2}The Goal}{2}% 
+\contentsline {subsection}{\numberline {2.3}Our Solution}{2}% 
+\contentsline {section}{\numberline {3}Technical Material}{3}% 
+\contentsline {subsection}{\numberline {3.1}Prior Work}{3}% 
+\contentsline {subsection}{\numberline {3.2}Design}{3}% 
+\contentsline {subsection}{\numberline {3.3}Platform}{3}% 
+\contentsline {section}{\numberline {4}Milestones}{3}% 
+\contentsline {subsection}{\numberline {4.1}Read Data}{4}% 
+\contentsline {subsection}{\numberline {4.2}Write Data}{4}% 
+\contentsline {subsection}{\numberline {4.3}Expose Data}{4}% 
+\contentsline {subsection}{\numberline {4.4}Encrypt Data}{4}% 
+\contentsline {subsection}{\numberline {4.5}Allow Modifying Vehicle State}{4}% 
+\contentsline {subsection}{\numberline {4.6}Additional Sensors}{4}% 
+\contentsline {section}{\numberline {5}Conclusion}{4}% 
+\contentsline {section}{\numberline {6}References}{4}% 
