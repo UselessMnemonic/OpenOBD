@@ -14,6 +14,7 @@
 \usepackage[symbol]{footmisc}
 \usepackage{textcomp}
 \usepackage{dirtytalk}
+\usepackage{float}
 
 \newcommand{\st}{~\mid~}
 \newcommand{\ind}{$~~~$}
@@ -160,6 +161,10 @@ Our system is built around an API which processes and returns JSON structures. W
 
 Upon activating the device, you will need to pair your device with it. This is done by generating an RSA keypair. The \say{public} key is then sent over (encrypted) Bluetooth to your device. This certificate can be shared to other devices you want to have access to your OpenOBD dongle. This provides authentication of the user/device. The Bluetooth spec itself provides encryption based around a PIN which the user must enter when it establishes a connection. This way, the data is encrypted and all identities can be verified. Since the device will automatically decrypt and encrypt with its private key, data sent elsewhere will be useless and requests from unauthorized users will likewise be invalid commands.
 
+\subsection{Example App}
+
+We have a functional Android application which can send requests and receive a response. It currently just prints out the returned JSON. It is merely a proof-of-concept for sending and receiving formatted JSON, and while it is a minimum viable product (MVP), it serves its purpose for debugging and providing sample code to would-be programmers who wish to build on our platform.
+
 \subsection{Allow Modifying Vehicle State}
 
 This is mostly unimplemented. While we have a specification for how to format a JSON write query, there is currently no wrapper to handle and format this data on the OpenOBD platform. The reason for this is that it is relatively low-priority. There are only a few writes you often want to do, such as clearing an error code, but writing is also the biggest source of vulnerabilities. Implementing a few simple writes would be possible, but it was decided to focus on other pathways and expand this later. Sanity-checking inputs is important.
@@ -167,6 +172,17 @@ This is mostly unimplemented. While we have a specification for how to format a 
 \subsection{Additional Sensors}
 
 We have added a GPS module and a storage module to our TinyZero. This allows tracking the vehicle's location remotely. We have plans to add a SIM Card module, to allow vehicle status to be tracked via the internet, but we do not have one of these modules. The Freematic UART dongle also allows for sensing battery levels, and we have implemented preliminary support for this, though it has gone untested. This and a few other optional PIDs exist as part of the ELM chip.
+
+\section{Results}
+
+Our platform, though incomplete, serves as a functional proof-of-concept for our vision. While it cannot quite be described as an MVP, this is solely because we are missing the connector and have no been able to test it on a real vehicle. The entire datapath to read and transmit data securely has been implemented. We have dummied the UART response from the ELM and have tested the secure connection over Bluetooth.
+\begin{centering}
+\begin{figure}[H]
+  \includegraphics[width=0.3\linewidth]{phone.png}
+  \includegraphics[width=0.56\linewidth]{serial.png}
+  \caption{The example Android application and the corresponding serial output from the prototype module.}
+\end{figure}
+\end{centering}
 
 \section{Future Work}
 

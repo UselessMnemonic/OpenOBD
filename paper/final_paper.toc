@@ -7,13 +7,15 @@
 \contentsline {subsection}{\numberline {3.1}Prior Work}{3}% 
 \contentsline {subsection}{\numberline {3.2}Design}{4}% 
 \contentsline {subsection}{\numberline {3.3}Platform}{4}% 
-\contentsline {section}{\numberline {4}Milestones}{4}% 
+\contentsline {section}{\numberline {4}Milestones}{5}% 
 \contentsline {subsection}{\numberline {4.1}Read Data}{5}% 
 \contentsline {subsection}{\numberline {4.2}Write Data}{5}% 
 \contentsline {subsection}{\numberline {4.3}Expose Data}{5}% 
 \contentsline {subsection}{\numberline {4.4}Encrypt Data}{5}% 
-\contentsline {subsection}{\numberline {4.5}Allow Modifying Vehicle State}{5}% 
-\contentsline {subsection}{\numberline {4.6}Additional Sensors}{5}% 
-\contentsline {section}{\numberline {5}Future Work}{6}% 
-\contentsline {section}{\numberline {6}Conclusion}{6}% 
-\contentsline {section}{\numberline {7}References}{6}% 
+\contentsline {subsection}{\numberline {4.5}Example App}{5}% 
+\contentsline {subsection}{\numberline {4.6}Allow Modifying Vehicle State}{6}% 
+\contentsline {subsection}{\numberline {4.7}Additional Sensors}{6}% 
+\contentsline {section}{\numberline {5}Results}{6}% 
+\contentsline {section}{\numberline {6}Future Work}{7}% 
+\contentsline {section}{\numberline {7}Conclusion}{7}% 
+\contentsline {section}{\numberline {8}References}{7}% 
