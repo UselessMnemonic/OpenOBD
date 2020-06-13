@@ -125,13 +125,19 @@ The system is a relay between the car's OBD port and any supporting Bluetooth ho
 
 For communicating with other devices, we chose Bluetooth. It's the most common option for device-to-device connections, and modern Bluetooth with Low Energy (BLE) is quite efficient, which is important for a device which can potentially leech your car's battery. Ad-hoc Wi-Fi is just not efficient nor particularly secure, and interfacing over it would have been unnecessarily difficult for no additional advantages. It was important that consumer smartphones be able to interface directly with the OpenOBD module.
 
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.6\linewidth]{modulePathway.png}
+\caption{The datapath in closer detail}
+\end{center}
+\end{figure}
+
 \subsection{Platform}
 
 For our Microcontroller, we selected the TinyZero by TinyCircuits. This is an ARM microcontroller that is modular and designed for prototyping. It is very small, which makes it ideal for prototyping a project that needs to fit into a compact package. The platform has excellent support for many embedded libraries, especially those designed for Arduino, and it supports a modular system of \say{stacking} modules, whereby a number of separate add-ons can simply be attached to each other, like a simplified Arduino HAT system. This makes it perfect for expanding functionality as we continue to prototype.
 
 One decision we had to make was whether we implement our own OBD-II communicator. We ultimately chose not to do this for a variety of reasons. The OBD-II specification covers how data should be stored and transmitted, as well as what kind of data should be tracked and made available. A number of different, competing specifications for actually retrieving this data exist, and they vary greatly in voltage, pinout, and data format. This makes interpreting the data difficult and potentially hazardous to the vehicle if not done correctly. It would also have been more work than the rest of the project combined, and likely take up the majority of the time. Since commercial solutions for this connector exist, we decided it was better to focus on the novel aspects of our project and not to re-invent the wheel. After a survey of the market, we found two decent options, both of which use an ELM347 chip to handle the bulk of the work. After comparing options, a dongle by Freematics was cheaper and provided additional functionality built right in, so it became the obvious choice. Unfortunately, it did not arrive before the end of the quarter, likely due to shipping delays.
 
-\newpage
 \section{Milestones}
 
 \begin{description}
@@ -193,11 +199,15 @@ The device's size, even in prototype form, is small enough to fit within an OBD-
 
 \section{Future Work}
 
-First and foremost, we still need to attach and test the Freematics OBD Dongle. This will complete our desired deliverable. We would like to add SIM Card support so that the module can be tested for internet readiness (i.e. testing if the module can reliably send JSON data to a designated internet host). Further, we aim to support the expanded diagnostics capabilities offered by some manufacturers (e.g. BMW and Mercedes) despite being proprietary. Finally, to encourage further support of the API, we wish to distribute libraries for various platforms like Android, iOS, and IFTTT.
+First and foremost, we still need to attach and test the Freematics OBD Dongle. This will complete our desired deliverables and produce an MVP. Beyond this, We would really like to add SIM Card support so that the module can be tested for internet readiness (i.e. testing if the module can reliably send JSON data to a designated internet host). This would enable the module to be accessed remotely, and we deliberately chose an authentication scheme that would make this possible. Further, we aim to support the expanded diagnostics capabilities offered by some manufacturers (e.g. BMW and Mercedes) despite being proprietary. Supporting these will be much more difficult, as they may change between models, so we may also need to implement a way users can develop custom PIDs and either flash their modules or customized payloads to enable utilization of these diagnostic systems. Finally, to encourage further support of the API, we wish to distribute libraries to simplify interfacing with the API and to expose support in our demonstration app for Tasker and IFTTT, two popular automation apps for Android and iOS respectively.
 
 \section{Conclusion}
 
 In all, the module is a neat and well-defined proof on concept, but we regretfully have no tests for a real-world setting. We still have a lot to learn about bringing a product to market. The module offers plenty of room for further improvement, which remains one of our key goals as we continue to introduce new iterations of our design. We think ours could be a viable product, and it would certainly find use by its developers.
+
+In terms of meeting our goals, I feel that the design of the product is a success. By the metric imposed above, we created a platform which is (theoretically) open, secure, and extensible. It is open by virtue of being open source, and currently runs on a hardware platform anyone can buy and use. If we brought this to market, we would like the hardware to be open source, too. It is secure because all interactions are authenticated by generated keypairs, and the device will wipe any remaining data in the event it is reset. It is currently safe, although this is because potentially unsafe operations have not been implemented, but because requests are done via an intermediary API, we can ensure all calls made are safe. And finally, it is extensible, because it just provides a data pathway. Developing an app or designing hardware to interact with your car can be no harder than one that accesses social media or scrapes a website.
+
+At the very least, both of us developed a product that solves a problem we had. Our solution is no-compromises, beats out the alternatives in a number of areas, and we were able to learn a lot by building it. Although we had a number of unfortunate setbacks this quarter, we do feel we met our benchmarks for success and accomplished what we set out to do.
 
 \end{document}
 
