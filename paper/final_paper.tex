@@ -113,7 +113,7 @@ We wish to expand this philosophy into the domain of the Internet of Things.
 
 \subsection{Prior Work}
 
-\todo Examination of other products on the market and which of the above points they fail on.
+Plenty of devices exist on the market today for connecting smartphones to OBD systems. Consequentially, there are apps that support dozens of OBD adapters and that share diagnostic information with the user. However, not all adapters require secure pin authentication, and seldom do any supporting apps perform any extra authentication. Further, while the OBD technology employed by any of these solutions is industry standard, the modules and apps themselves do not adhere to any particular standard. Not every app developer can target every module, and are often times limited by what the host platform supports. For instance, iOS devices are far more limited in terms of what the user may do with Bluetooth, and often the practical solution for developers is to use an ad-hoc wifi network instead. 
 
 \subsection{Design}
 
@@ -121,7 +121,7 @@ We wish to expand this philosophy into the domain of the Internet of Things.
 \includegraphics[width=0.7\linewidth]{pathway.png}
 \end{center}
 
-\todo High-level description of system. Why we chose JSON. How to ensure the device is neutral, secure, and trustworthy. Security considerations. API structure. Etc.
+The system is a relay between the car's OBD port and any supporting Bluetooth host. In this case, a supporting host is one that parses UART text streams. In particular, the text stream is comprised of valid JSON objects. We chose JSON because it is internet-ready, seeing as how RESTful APIs largely employ JSON in their communication schemes. Our decision is not without precedent, as many smart devices communicate using JSON (for example, Philip's Hue wireless lights).
 
 For communicating with other devices, we chose Bluetooth. It's the most common option for device-to-device connections, and modern Bluetooth with Low Energy (BLE) is quite efficient, which is important for a device which can potentially leech your car's battery. Ad-hoc Wi-Fi is just not efficient nor particularly secure, and interfacing over it would have been unnecessarily difficult for no additional advantages. It was important that consumer smartphones be able to interface directly with the OpenOBD module.
 
@@ -168,7 +168,7 @@ We have a functional Android application which can send requests and receive a r
 
 \subsection{Allow Modifying Vehicle State}
 
-This is mostly unimplemented. While we have a specification for how to format a JSON write query, there is currently no wrapper to handle and format this data on the OpenOBD platform. The reason for this is that it is relatively low-priority. There are only a few writes you often want to do, such as clearing an error code, but writing is also the biggest source of vulnerabilities. Implementing a few simple writes would be possible, but it was decided to focus on other pathways and expand this later. Sanity-checking inputs is important.
+This is mostly unimplemented. While we have a specification for how to format a JSON write query, there is currently no wrapper to conduct writes on the OpenOBD platform. The reason for this is that it is relatively low-priority. There are only a few writes you often want to do, such as clearing an error code, but writing is also the biggest source of vulnerabilities. Implementing a few simple writes would be possible, but it was decided to focus on other pathways and expand this later. Sanity-checking inputs is important.
 
 \subsection{Additional Sensors}
 
@@ -189,21 +189,15 @@ Preliminary results for testing security were good. If one assumes a malicious a
 
 Though we are using dummy data instead of the actual UART connection to read data from a real vehicle, the device can process requests rapidly. We expect the ELM to be the bottleneck for requests, however, and we are eager to see what kind of throughput we can get on a real vehicle.
 
-The device's size, even in prototype form, is small enough to fit within an OBD-II port. The connector itself is significantly larger, and we believe with a dedicated Printed Circuit Board (PCB) we could make it even smaller. This would make it the smallest such device on the market. Additionally, we used our experience optimizing the TinyZero hardware to make it incredibly energy efficient, and it often draws only 0.001 mA of current in its standby state.
+The device's size, even in prototype form, is small enough to fit within an OBD-II port. The connector itself is significantly larger, and we believe with a dedicated Printed Circuit Board (PCB) we could make it even smaller. This would make it the smallest such device on the market.
 
 \section{Future Work}
 
-\todo We still need to actually add and test the Freematics Dongle. We'd like to add SIM Card support. We'd like to add support for expanded diagnostics like BMW and Merceded have, but they're proprietary so it wouldn't be easy. We'd like to expand the app to better support diagnostics. Maybe even write an Android library to make using the API even easier for developers. Write an iOS app at some point. Add Tasker and IFTTT support to our app. We'd like to design an enclosure for it.
+First and foremost, we still need to attach and test the Freematics OBD Dongle. This will complete our desired deliverable. We would like to add SIM Card support so that the module can be tested for internet readiness (i.e. testing if the module can reliably send JSON data to a designated internet host). Further, we aim to support the expanded diagnostics capabilities offered by some manufacturers (e.g. BMW and Mercedes) despite being proprietary. Finally, to encourage further support of the API, we wish to distribute libraries for various platforms like Android, iOS, and IFTTT.
 
 \section{Conclusion}
 
-\todo We're disappointed we couldn't actually test it on a real car because we never got the dongle. We had a demo planned where we would drive around and show output live via a webpage. We think there's real potential here. We want to keep working on this. We learned a lot, especially about encryption. We still have a lot to learn about bringing a product to market. After this, we might try building a product that relies on this one and see how it goes. Maybe make some tweaks if we find it's less developer-friendly than we'd like. Overall conclusion: we think this is a viable product and we would use it ourselves, and probably will.
-
-\section{References}
-
-\todo Add some references, especially to the first section. Maybe someone has done a study about consumer choice when buying cars, how big the aftermarket industry is, etc. And then add those figures to the Intro section.
-
-%\footnote{\label{klooster}\textit{Revolutions in the Atlantic World}, Wim Klooster, 2018, New York Press}
+In all, the module is a neat and well-defined proof on concept, but we regretfully have no tests for a real-world setting. We still have a lot to learn about bringing a product to market. The module offers plenty of room for further improvement, which remains one of our key goals as we continue to introduce new iterations of our design. We think ours could be a viable product, and it would certainly find use by its developers.
 
 \end{document}
 
